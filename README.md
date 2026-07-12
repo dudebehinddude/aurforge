@@ -1,9 +1,9 @@
 # Aurforge
 
 Aurforge is a personal, self-hosted Arch package builder and pacman repository.
-It imports AUR packages or validated local `PKGBUILD` directories, delays builds,
-builds in disposable Arch containers, and publishes resulting package archives
-for pacman and yay clients.
+It imports AUR packages or validated local `PKGBUILD` directories, delays AUR builds
+until each commit is old enough, builds in disposable Arch containers, and
+publishes resulting package archives for pacman and yay clients.
 
 ## Host Requirements
 
@@ -80,13 +80,18 @@ the package metadata and static audit warnings, then asks for one confirmation.
 
 ## Update Behavior
 
-Aurforge tracks the exact AUR Git commit. New commits are queued after
-`AURFORGE_UPDATE_DELAY`, defaulting to 12 hours. The scheduler checks the commit
-again before building. Normal `yay` updates only download packages already
-published by Aurforge; they do not compile packages on clients.
+Aurforge tracks the exact AUR Git commit. Builds wait until that commit is at
+least `AURFORGE_UPDATE_DELAY` old (default 12 hours), measured from the commit
+timestamp—not from when Aurforge first noticed it. Already-old commits can build
+immediately. If a newer AUR revision appears before an eligible job runs, the
+older job is skipped so a reverted or replaced PKGBUILD is never built.
 
 Local packages update only through the explicit `aurforge update --local` flow,
 which lets you inspect the resulting package metadata before it is queued.
+Confirmed local imports are eligible to build immediately.
+
+Normal `yay` updates only download packages already published by Aurforge; they
+do not compile packages on clients.
 
 ## Resource And Isolation Policy
 

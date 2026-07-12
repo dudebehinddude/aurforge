@@ -111,7 +111,7 @@ func add(ctx context.Context, cfg internal.Config, db *ent.Client, args []string
 		if err != nil {
 			fatal(err)
 		}
-		fmt.Printf("Imported %s as package version %d; build eligible after the configured delay.\n", preview.Package.Name, id)
+		fmt.Printf("Imported %s as package version %d; build queued immediately.\n", preview.Package.Name, id)
 		return
 	}
 	query := strings.Join(queryParts, " ")
@@ -169,7 +169,7 @@ func add(ctx context.Context, cfg internal.Config, db *ent.Client, args []string
 			rootID = id
 		}
 	}
-	fmt.Printf("Imported %s and %d dependency package(s); root package version %d is eligible after the configured delay.\n", preview.Package.Name, len(graph)-1, rootID)
+	fmt.Printf("Imported %s and %d dependency package(s); root package version %d builds once its AUR commit is older than the update delay (and is still the latest revision).\n", preview.Package.Name, len(graph)-1, rootID)
 }
 
 func status(ctx context.Context, db *ent.Client) {

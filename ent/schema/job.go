@@ -12,7 +12,7 @@ func (Job) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int64("package_version_id"),
 		field.String("kind").Default("build"),
-		field.Enum("status").Values("pending", "running", "built", "published", "failed").Default("pending"),
+		field.Enum("status").Values("pending", "running", "built", "published", "failed", "skipped").Default("pending"),
 		field.Time("eligible_at"),
 		field.Time("claimed_at").Optional().Nillable(),
 		field.Time("finished_at").Optional().Nillable(),

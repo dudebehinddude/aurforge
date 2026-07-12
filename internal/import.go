@@ -195,7 +195,8 @@ func AcceptLocal(ctx context.Context, cfg Config, db *ent.Client, preview Previe
 			return 0, err
 		}
 	}
-	return CreatePackage(ctx, db, preview.Package, target, preview.Digest, preview.Digest, cfg.UpdateDelay)
+	// Local imports are explicitly confirmed; build as soon as the worker is free.
+	return CreatePackage(ctx, db, preview.Package, target, preview.Digest, preview.Digest, time.Now())
 }
 
 func AcceptAUR(ctx context.Context, cfg Config, db *ent.Client, preview Preview, revision string) (int, error) {
@@ -210,7 +211,24 @@ func AcceptAUR(ctx context.Context, cfg Config, db *ent.Client, preview Preview,
 			}
 		}
 	}
-	return CreatePackage(ctx, db, preview.Package, target, revision, preview.Digest, cfg.UpdateDelay)
+	commitTime, err := GitCommitTime(ctx, target)
+	if err != nil {
+		return 0, err
+	}
+	eligibleAt := EligibleAtFromCommit(commitTime, cfg.UpdateDelay, time.Now())
+	return CreatePackage(ctx, db, preview.Package, target, revision, preview.Digest, eligibleAt)
+}
+
+func GitCommitTime(ctx context.Context, repo string) (time.Time, error) {
+	value, err := output(ctx, "git", "-C", repo, "log", "-1", "--format=%cI")
+	if err != nil {
+		return time.Time{}, fmt.Errorf("read commit time: %w", err)
+	}
+	commitTime, err := time.Parse(time.RFC3339, strings.TrimSpace(value))
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parse commit time %q: %w", value, err)
+	}
+	return commitTime, nil
 }
 
 func PromptConfirm(reader *bufio.Reader, writer *os.File, prompt string, yes bool) (bool, error) {

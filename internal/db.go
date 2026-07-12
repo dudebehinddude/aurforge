@@ -41,40 +41,68 @@ type Job struct {
 }
 
 func ClaimJob(ctx context.Context, client *ent.Client) (*Job, error) {
-	tx, err := client.Tx(ctx)
-	if err != nil {
-		return nil, err
+	for {
+		tx, err := client.Tx(ctx)
+		if err != nil {
+			return nil, err
+		}
+		claimed, err := tx.Job.Query().
+			Where(job.StatusEQ(job.StatusPending), job.EligibleAtLTE(time.Now())).
+			Order(ent.Asc(job.FieldEligibleAt), ent.Asc(job.FieldID)).
+			First(ctx)
+		if ent.IsNotFound(err) {
+			_ = tx.Rollback()
+			return nil, nil
+		}
+		if err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+		version, err := tx.PackageVersion.Get(ctx, int(claimed.PackageVersionID))
+		if err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+		latest, err := tx.PackageVersion.Query().
+			Where(packageversion.PackageIDEQ(version.PackageID)).
+			Order(ent.Desc(packageversion.FieldFirstSeenAt), ent.Desc(packageversion.FieldID)).
+			First(ctx)
+		if err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+		if latest.ID != version.ID {
+			if _, err := tx.Job.UpdateOne(claimed).
+				SetStatus(job.StatusSkipped).
+				SetFinishedAt(time.Now()).
+				SetError("superseded by newer revision").
+				Save(ctx); err != nil {
+				_ = tx.Rollback()
+				return nil, err
+			}
+			if err := tx.Commit(); err != nil {
+				return nil, err
+			}
+			continue
+		}
+		if _, err := tx.Job.UpdateOne(claimed).
+			SetStatus(job.StatusRunning).
+			SetClaimedAt(time.Now()).
+			SetAttempts(claimed.Attempts + 1).
+			Save(ctx); err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+		pkg, err := tx.ManagedPackage.Get(ctx, int(version.PackageID))
+		if err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		return &Job{ID: claimed.ID, PackageName: pkg.Name, SourcePath: pkg.SourcePath, PackageVersion: version.ID}, nil
 	}
-	defer tx.Rollback()
-	claimed, err := tx.Job.Query().
-		Where(job.StatusEQ(job.StatusPending), job.EligibleAtLTE(time.Now())).
-		Order(ent.Asc(job.FieldEligibleAt), ent.Asc(job.FieldID)).
-		First(ctx)
-	if ent.IsNotFound(err) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if _, err := tx.Job.UpdateOne(claimed).
-		SetStatus(job.StatusRunning).
-		SetClaimedAt(time.Now()).
-		SetAttempts(claimed.Attempts + 1).
-		Save(ctx); err != nil {
-		return nil, err
-	}
-	version, err := tx.PackageVersion.Get(ctx, int(claimed.PackageVersionID))
-	if err != nil {
-		return nil, err
-	}
-	pkg, err := tx.ManagedPackage.Get(ctx, int(version.PackageID))
-	if err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	return &Job{ID: claimed.ID, PackageName: pkg.Name, SourcePath: pkg.SourcePath, PackageVersion: version.ID}, nil
 }
 
 func MarkJob(ctx context.Context, client *ent.Client, id int, status job.Status, logPath, failure string) error {
@@ -88,7 +116,17 @@ func MarkJob(ctx context.Context, client *ent.Client, id int, status job.Status,
 	return update.Exec(ctx)
 }
 
-func CreatePackage(ctx context.Context, client *ent.Client, pkg PackageInfo, sourcePath, revision, digest string, delay time.Duration) (int, error) {
+// EligibleAtFromCommit returns when a revision may be built: commit time plus the
+// configured delay. Already-old commits become eligible immediately.
+func EligibleAtFromCommit(commitTime time.Time, delay time.Duration, now time.Time) time.Time {
+	eligible := commitTime.Add(delay)
+	if eligible.After(now) {
+		return eligible
+	}
+	return now
+}
+
+func CreatePackage(ctx context.Context, client *ent.Client, pkg PackageInfo, sourcePath, revision, digest string, eligibleAt time.Time) (int, error) {
 	tx, err := client.Tx(ctx)
 	if err != nil {
 		return 0, err
@@ -153,9 +191,12 @@ func CreatePackage(ctx context.Context, client *ent.Client, pkg PackageInfo, sou
 				return 0, err
 			}
 		}
+		if err := skipPendingJobsForPackage(ctx, tx, int64(managed.ID), int64(version.ID)); err != nil {
+			return 0, err
+		}
 		if _, err := tx.Job.Create().
 			SetPackageVersionID(int64(version.ID)).
-			SetEligibleAt(time.Now().Add(delay)).
+			SetEligibleAt(eligibleAt).
 			SetCreatedAt(time.Now()).
 			Save(ctx); err != nil {
 			return 0, err
@@ -165,6 +206,35 @@ func CreatePackage(ctx context.Context, client *ent.Client, pkg PackageInfo, sou
 		return 0, err
 	}
 	return version.ID, nil
+}
+
+func skipPendingJobsForPackage(ctx context.Context, tx *ent.Tx, packageID, keepVersionID int64) error {
+	versions, err := tx.PackageVersion.Query().
+		Where(
+			packageversion.PackageIDEQ(packageID),
+			packageversion.IDNEQ(int(keepVersionID)),
+		).
+		All(ctx)
+	if err != nil {
+		return err
+	}
+	if len(versions) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(versions))
+	for _, version := range versions {
+		ids = append(ids, int64(version.ID))
+	}
+	_, err = tx.Job.Update().
+		Where(
+			job.StatusEQ(job.StatusPending),
+			job.PackageVersionIDIn(ids...),
+		).
+		SetStatus(job.StatusSkipped).
+		SetFinishedAt(time.Now()).
+		SetError("superseded by newer revision").
+		Save(ctx)
+	return err
 }
 
 func depKind(value string) dependency.DependencyKind {

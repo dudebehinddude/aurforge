@@ -70,7 +70,7 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "package_version_id", Type: field.TypeInt64},
 		{Name: "kind", Type: field.TypeString, Default: "build"},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending", "running", "built", "published", "failed"}, Default: "pending"},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"pending", "running", "built", "published", "failed", "skipped"}, Default: "pending"},
 		{Name: "eligible_at", Type: field.TypeTime},
 		{Name: "claimed_at", Type: field.TypeTime, Nullable: true},
 		{Name: "finished_at", Type: field.TypeTime, Nullable: true},
