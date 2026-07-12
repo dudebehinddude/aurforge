@@ -66,6 +66,7 @@ While the controller is running, Aurforge installs a host `aurforge` command int
 aurforge add <aur-query>
 aurforge add --local <package>
 aurforge update --local <package>
+aurforge remove <package>
 aurforge status
 ```
 
@@ -77,6 +78,10 @@ the package metadata and static audit warnings, then asks for one confirmation.
 (`AURFORGE_LOCAL_IMPORT_ROOT`, mounted at `/imports`). Absolute paths under
 `/imports` still work. Accepted packages are snapshotted under managed
 `sources/`; builders never receive the import directory.
+
+`remove <package>` works for both AUR and local packages. It cancels related
+jobs, removes published packages from the pacman repository, deletes source
+snapshots, and drops the managed package from the database.
 
 ## Update Behavior
 

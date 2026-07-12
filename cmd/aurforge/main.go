@@ -57,6 +57,8 @@ func main() {
 		add(ctx, cfg, db, os.Args[2:])
 	case "status":
 		status(ctx, db)
+	case "remove":
+		remove(ctx, cfg, db, os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -172,6 +174,43 @@ func add(ctx context.Context, cfg internal.Config, db *ent.Client, args []string
 	fmt.Printf("Imported %s and %d dependency package(s); root package version %d builds once its AUR commit is older than the update delay (and is still the latest revision).\n", preview.Package.Name, len(graph)-1, rootID)
 }
 
+func remove(ctx context.Context, cfg internal.Config, db *ent.Client, args []string) {
+	if len(args) == 0 {
+		fatal(fmt.Errorf("remove requires a package name"))
+	}
+	yes := false
+	var names []string
+	for _, arg := range args {
+		switch arg {
+		case "--yes", "-y":
+			yes = true
+		default:
+			names = append(names, arg)
+		}
+	}
+	if len(names) != 1 {
+		fatal(fmt.Errorf("remove requires exactly one package name"))
+	}
+	name := names[0]
+	reader := bufio.NewReader(os.Stdin)
+	ok, err := internal.PromptConfirm(reader, os.Stdout, fmt.Sprintf("Remove managed package %q (repo packages, jobs, and sources)?", name), yes)
+	if err != nil {
+		fatal(err)
+	}
+	if !ok {
+		return
+	}
+	result, err := internal.RemovePackage(ctx, cfg, db, name)
+	if err != nil {
+		fatal(err)
+	}
+	fmt.Printf("Removed %s package %s", result.SourceKind, result.Name)
+	if len(result.RepoPackages) > 0 {
+		fmt.Printf(" (%s)", strings.Join(result.RepoPackages, ", "))
+	}
+	fmt.Println(".")
+}
+
 func status(ctx context.Context, db *ent.Client) {
 	packages, err := internal.ListPackages(ctx, db)
 	if err != nil {
@@ -204,9 +243,10 @@ func showPreview(preview internal.Preview) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: aurforge <controller|scheduler|worker|publisher|add|update|status>")
+	fmt.Fprintln(os.Stderr, "usage: aurforge <controller|scheduler|worker|publisher|add|update|remove|status>")
 	fmt.Fprintln(os.Stderr, "       aurforge add <aur-query> [--select N] [--yes]")
 	fmt.Fprintln(os.Stderr, "       aurforge add --local <package> [--yes]")
+	fmt.Fprintln(os.Stderr, "       aurforge remove <package> [--yes]")
 }
 
 func fatal(err error) { fmt.Fprintln(os.Stderr, "aurforge:", err); os.Exit(1) }
