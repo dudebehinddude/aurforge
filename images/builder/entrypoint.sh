@@ -26,6 +26,12 @@ if [[ ! -f "$workdir/PKGBUILD" ]]; then
 fi
 cd "$workdir"
 
+# Fresh archlinux images ship with an empty pacman sync dir. --syncdeps needs
+# core/extra metadata to install official depends/makedepends (fuse2, etc.).
+# AUR dependencies are separate Aurforge packages (imported + built on their
+# own); pacman -Sy does not install those.
+sudo pacman -Sy --noconfirm
+
 if [[ "$#" -eq 0 ]]; then
   set -- makepkg --syncdeps --noconfirm --cleanbuild --force
 fi
