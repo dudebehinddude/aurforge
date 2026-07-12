@@ -67,6 +67,7 @@ services:
     command: ["scheduler"]
     volumes:
       - ${AURFORGE_DATA_ROOT:?AURFORGE_DATA_ROOT is required}:/var/lib/aurforge
+      - ${AURFORGE_LOCAL_IMPORT_ROOT:?AURFORGE_LOCAL_IMPORT_ROOT is required}:/imports
 
   worker:
     <<: *app-common

@@ -9,7 +9,7 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/aurforge ./cmd/aur
 FROM archlinux:base
 
 RUN pacman -Syu --noconfirm \
-    && pacman -S --noconfirm --needed ca-certificates docker git pacman-contrib \
+    && pacman -S --noconfirm --needed ca-certificates curl docker git pacman-contrib \
     && pacman -Scc --noconfirm
 
 COPY --from=build /out/aurforge /usr/local/bin/aurforge

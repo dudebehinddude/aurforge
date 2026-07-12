@@ -58,6 +58,9 @@ func RunScheduler(ctx context.Context, cfg Config, db *ent.Client, logger *slog.
 		if err := refreshAUR(ctx, cfg, db, logger); err != nil {
 			logger.Error("scheduler refresh failed", "error", err)
 		}
+		if err := refreshLocal(ctx, cfg, db, logger); err != nil {
+			logger.Error("local package refresh failed", "error", err)
+		}
 		select {
 		case <-ctx.Done():
 			return nil
@@ -98,6 +101,62 @@ func refreshAUR(ctx context.Context, cfg Config, db *ent.Client, logger *slog.Lo
 			return err
 		}
 		logger.Info("queued AUR update", "package", name, "revision", revision)
+	}
+	return nil
+}
+
+// refreshLocal runs an opt-in updater from a trusted local import directory.
+// The updater changes the import source; AcceptLocal snapshots that source before
+// the worker receives it, so build containers still only see immutable input.
+func refreshLocal(ctx context.Context, cfg Config, db *ent.Client, logger *slog.Logger) error {
+	packages, err := db.ManagedPackage.Query().Where(managedpackage.SourceKindEQ(managedpackage.SourceKindLocal), managedpackage.EnabledEQ(true)).All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, tracked := range packages {
+		preview, err := PreviewLocal(cfg, tracked.SourceRef)
+		if err != nil {
+			logger.Warn("local package source unavailable", "package", tracked.Name, "error", err)
+			continue
+		}
+		updater := filepath.Join(preview.Path, "update-pkgbuild.sh")
+		if _, err := os.Stat(updater); os.IsNotExist(err) {
+			continue
+		} else if err != nil {
+			logger.Warn("local package updater unavailable", "package", tracked.Name, "error", err)
+			continue
+		}
+		updateCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		command := exec.CommandContext(updateCtx, "sh", updater)
+		command.Dir = preview.Path
+		result, err := command.CombinedOutput()
+		cancel()
+		if err != nil {
+			failure := fmt.Errorf("run update-pkgbuild.sh: %w: %s", err, strings.TrimSpace(string(result)))
+			logger.Warn("local package update failed", "package", tracked.Name, "error", failure)
+			NotifyFailure(ctx, cfg, tracked.Name, failure)
+			continue
+		}
+		preview, err = PreviewLocal(cfg, tracked.SourceRef)
+		if err != nil {
+			logger.Warn("updated local package preview failed", "package", tracked.Name, "error", err)
+			continue
+		}
+		if preview.Package.Name != tracked.Name {
+			logger.Warn("local updater changed package name", "package", tracked.Name, "updated_name", preview.Package.Name)
+			continue
+		}
+		exists, err := db.PackageVersion.Query().Where(packageversion.PackageIDEQ(int64(tracked.ID)), packageversion.RevisionEQ(preview.Digest)).Exist(ctx)
+		if err != nil {
+			return err
+		}
+		if exists {
+			continue
+		}
+		if _, err := AcceptLocal(ctx, cfg, db, preview); err != nil {
+			return err
+		}
+		logger.Info("queued local package update", "package", tracked.Name, "version", preview.Package.Version)
 	}
 	return nil
 }

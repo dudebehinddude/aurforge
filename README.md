@@ -87,9 +87,13 @@ timestamp—not from when Aurforge first noticed it. Already-old commits can bui
 immediately. If a newer AUR revision appears before an eligible job runs, the
 older job is skipped so a reverted or replaced PKGBUILD is never built.
 
-Local packages update only through the explicit `aurforge update --local` flow,
-which lets you inspect the resulting package metadata before it is queued.
-Confirmed local imports are eligible to build immediately.
+Local packages without an updater change only through the explicit
+`aurforge update --local` flow. A local package can opt into automatic updates
+by including `update-pkgbuild.sh`; the scheduler runs it from the trusted local
+import directory on every poll. If it changes the package, Aurforge snapshots
+the result and queues it immediately. The updater must keep `PKGBUILD` and, if
+present, `.SRCINFO` synchronized. Build containers only receive that immutable
+snapshot, not the import directory.
 
 Normal `yay` updates only download packages already published by Aurforge; they
 do not compile packages on clients.
