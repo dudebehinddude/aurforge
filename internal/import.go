@@ -217,13 +217,16 @@ func PromptConfirm(reader *bufio.Reader, writer *os.File, prompt string, yes boo
 	if yes {
 		return true, nil
 	}
-	fmt.Fprintf(writer, "%s [y/N] ", prompt)
+	fmt.Fprintf(writer, "%s [Y/n] ", prompt)
 	answer, err := reader.ReadString('\n')
 	if err != nil {
 		return false, err
 	}
 	answer = strings.ToLower(strings.TrimSpace(answer))
-	return answer == "y" || answer == "yes", nil
+	if answer == "" || answer == "y" || answer == "yes" {
+		return true, nil
+	}
+	return false, nil
 }
 
 func run(ctx context.Context, name string, args ...string) error {
