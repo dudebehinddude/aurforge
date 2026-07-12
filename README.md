@@ -101,15 +101,16 @@ do not compile packages on clients.
 
 ## Resource And Isolation Policy
 
-The worker starts one build at a time by default. Every job gets a new Arch
-container with a hard CPU cap, low CPU shares, memory limit, PID limit, timeout,
-read-only root filesystem, temporary workspace, and no Docker socket.
+The worker starts one build at a time by default. Every job gets a new disposable
+Arch container with CPU, memory, PID, and timeout limits, a read-only source
+snapshot mount, a shared pacman cache, a staging output directory, and no Docker
+socket. The build rootfs stays writable so `makepkg --syncdeps` can install
+build dependencies; isolation comes from the disposable container and the
+limited mounts, not from a read-only root.
 
 The worker is the only service with the Docker socket because it creates build
 containers. The socket is host-root equivalent, so do not grant untrusted users
-access to the Compose project or Docker group. Build containers receive only a
-read-only immutable source snapshot, a package cache, a disposable workspace,
-and a staging output directory.
+access to the Compose project or Docker group.
 
 Configure `AURFORGE_BUILD_CPU_LIMIT` to about 80% of host CPUs, for example
 `6.4` on an eight-core machine. `AURFORGE_BUILD_CPU_SHARES` keeps builds lower

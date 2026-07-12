@@ -92,7 +92,7 @@ func PreviewAUR(ctx context.Context, cfg Config, name string) (Preview, string, 
 	if err := os.RemoveAll(root); err != nil {
 		return Preview{}, "", err
 	}
-	if err := os.MkdirAll(filepath.Dir(root), 0o750); err != nil {
+	if err := os.MkdirAll(filepath.Dir(root), 0o755); err != nil {
 		return Preview{}, "", err
 	}
 	if err := run(ctx, "git", "clone", "--depth=1", "https://aur.archlinux.org/"+name+".git", root); err != nil {
@@ -188,10 +188,13 @@ func AURPackageExists(ctx context.Context, name string) (bool, error) {
 func AcceptLocal(ctx context.Context, cfg Config, db *ent.Client, preview Preview) (int, error) {
 	target := filepath.Join(cfg.SourceRoot(), "local", preview.Package.Name, preview.Digest)
 	if _, err := os.Stat(target); os.IsNotExist(err) {
-		if err := os.MkdirAll(target, 0o750); err != nil {
+		if err := os.MkdirAll(target, 0o755); err != nil {
 			return 0, err
 		}
 		if err := CopyTree(preview.Path, target); err != nil {
+			return 0, err
+		}
+		if err := ensureBuilderReadable(target); err != nil {
 			return 0, err
 		}
 	}
@@ -202,13 +205,16 @@ func AcceptLocal(ctx context.Context, cfg Config, db *ent.Client, preview Previe
 func AcceptAUR(ctx context.Context, cfg Config, db *ent.Client, preview Preview, revision string) (int, error) {
 	target := filepath.Join(cfg.SourceRoot(), "aur", preview.Package.Name, revision)
 	if _, err := os.Stat(target); os.IsNotExist(err) {
-		if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 			return 0, err
 		}
 		if err := os.Rename(preview.Path, target); err != nil {
 			if err := CopyTree(preview.Path, target); err != nil {
 				return 0, err
 			}
+		}
+		if err := ensureBuilderReadable(target); err != nil {
+			return 0, err
 		}
 	}
 	commitTime, err := GitCommitTime(ctx, target)

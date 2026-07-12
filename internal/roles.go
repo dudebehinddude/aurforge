@@ -151,23 +151,31 @@ func buildJob(parent context.Context, cfg Config, job Job) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(outputDir, 0o750); err != nil {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return err
 	}
-	if err := os.Chown(outputDir, 1000, 1000); err != nil {
+	if err := ensureBuilderReadable(job.SourcePath); err != nil {
 		return err
 	}
-	command := exec.CommandContext(ctx, "docker", "run", "--rm", "--network", "bridge", "--read-only",
-		"--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", cfg.BuildPIDs,
+	for _, path := range []string{outputDir, cacheDir} {
+		if err := os.Chown(path, 1000, 1000); err != nil {
+			return err
+		}
+	}
+	// Build containers are disposable (--rm). Keep resource limits and a
+	// read-only source mount, but leave the rootfs writable so makepkg can
+	// install build deps via sudo pacman. Dropping all caps / no-new-privileges
+	// / read-only root breaks that path.
+	command := exec.CommandContext(ctx, "docker", "run", "--rm", "--network", "bridge",
+		"--pids-limit", cfg.BuildPIDs,
 		"--cpus", buildCPUs, "--cpu-shares", cfg.BuildCPUShares, "--memory", cfg.BuildMemory,
-		"--tmpfs", "/tmp:rw,exec,nosuid,size=2g", "--tmpfs", "/build:rw,exec,nosuid,mode=1777,size=12g",
 		"--mount", "type=bind,src="+hostSource+",dst=/input,readonly",
 		"--mount", "type=bind,src="+hostOutput+",dst=/output",
 		"--mount", "type=bind,src="+hostCache+",dst=/var/cache/pacman/pkg",
-		cfg.BuilderImage, "bash", "-lc", "cp -a /input/. /build/ && cd /build && makepkg --syncdeps --noconfirm --cleanbuild")
+		cfg.BuilderImage)
 	logPath := logFile(cfg, job.ID)
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o750); err != nil {
 		return err
@@ -179,6 +187,25 @@ func buildJob(parent context.Context, cfg Config, job Job) error {
 	defer log.Close()
 	command.Stdout, command.Stderr = log, log
 	return command.Run()
+}
+
+// ensureBuilderReadable makes a source snapshot readable by the builder user
+// (uid 1000) inside the disposable build container.
+func ensureBuilderReadable(root string) error {
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		mode := info.Mode().Perm()
+		if entry.IsDir() {
+			return os.Chmod(path, mode|0o755)
+		}
+		return os.Chmod(path, mode|0o644)
+	})
 }
 
 func resolveCPUCap(ctx context.Context, value string) (string, error) {
