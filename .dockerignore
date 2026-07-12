@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+data
+local-pkgs
+*.pkg.tar.*
+*.log
+README.md
+LICENSE
