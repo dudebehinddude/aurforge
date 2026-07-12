@@ -64,9 +64,25 @@ func (_c *ManagedPackageCreate) SetCreatedAt(v time.Time) *ManagedPackageCreate 
 	return _c
 }
 
+// SetNillableCreatedAt sets the "created_at" field if the given value is not nil.
+func (_c *ManagedPackageCreate) SetNillableCreatedAt(v *time.Time) *ManagedPackageCreate {
+	if v != nil {
+		_c.SetCreatedAt(*v)
+	}
+	return _c
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_c *ManagedPackageCreate) SetUpdatedAt(v time.Time) *ManagedPackageCreate {
 	_c.mutation.SetUpdatedAt(v)
+	return _c
+}
+
+// SetNillableUpdatedAt sets the "updated_at" field if the given value is not nil.
+func (_c *ManagedPackageCreate) SetNillableUpdatedAt(v *time.Time) *ManagedPackageCreate {
+	if v != nil {
+		_c.SetUpdatedAt(*v)
+	}
 	return _c
 }
 
@@ -108,6 +124,14 @@ func (_c *ManagedPackageCreate) defaults() {
 	if _, ok := _c.mutation.Enabled(); !ok {
 		v := managedpackage.DefaultEnabled
 		_c.mutation.SetEnabled(v)
+	}
+	if _, ok := _c.mutation.CreatedAt(); !ok {
+		v := managedpackage.DefaultCreatedAt()
+		_c.mutation.SetCreatedAt(v)
+	}
+	if _, ok := _c.mutation.UpdatedAt(); !ok {
+		v := managedpackage.DefaultUpdatedAt()
+		_c.mutation.SetUpdatedAt(v)
 	}
 }
 

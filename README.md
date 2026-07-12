@@ -26,6 +26,18 @@ postgres://aurforge:password@host.docker.internal:5432/aurforge?sslmode=disable
 Aurforge maps that hostname to the Docker host. A database on another machine
 can use its normal LAN hostname or IP address instead.
 
+To reach Postgres on another Compose project without publishing its port, join
+that project's Docker network instead:
+
+```env
+AURFORGE_DATABASE_NETWORK=postgres_default
+AURFORGE_DATABASE_EXTERNAL=true
+DATABASE_URL=postgres://aurforge:password@postgres:5432/aurforge?sslmode=disable
+```
+
+`AURFORGE_DATABASE_NETWORK` must be the existing network name (`docker network ls`).
+`postgres` in the URL is the database container/service name on that network.
+
 Create the required storage directories on the server:
 
 ```sh
@@ -45,26 +57,26 @@ Start the control services and repository endpoint:
 docker compose up --build -d
 ```
 
+While the controller is running, Aurforge installs a host `aurforge` command into
+`/usr/local/bin`. Stopping or removing the controller deletes that command again.
+
 ## Import Packages
 
-Run the CLI inside the controller service so it can access the configured
-database and local import mount.
-
 ```sh
-docker compose exec controller aurforge add ghostty
-docker compose exec controller aurforge add --local /imports/t3-code-bin
-docker compose exec controller aurforge update --local /imports/t3-code-bin
-docker compose exec controller aurforge status
+aurforge add <aur-query>
+aurforge add --local <package>
+aurforge update --local <package>
+aurforge status
 ```
 
 `add <query>` searches the AUR and asks you to select a package. Aurforge clones
 the selected AUR package, resolves its recursive AUR dependency graph, displays
 the package metadata and static audit warnings, then asks for one confirmation.
 
-`add --local` only accepts paths below `/imports`, which maps to the distinct
-host directory configured by `AURFORGE_LOCAL_IMPORT_ROOT`. It snapshots accepted
-package directories under the managed `sources/` directory. Builders never
-receive the import directory.
+`add --local` takes a package directory name under the host import root
+(`AURFORGE_LOCAL_IMPORT_ROOT`, mounted at `/imports`). Absolute paths under
+`/imports` still work. Accepted packages are snapshotted under managed
+`sources/`; builders never receive the import directory.
 
 ## Update Behavior
 

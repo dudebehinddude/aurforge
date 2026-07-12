@@ -30,8 +30,14 @@ func init() {
 	managedpackageDescEnabled := managedpackageFields[4].Descriptor()
 	// managedpackage.DefaultEnabled holds the default value on creation for the enabled field.
 	managedpackage.DefaultEnabled = managedpackageDescEnabled.Default.(bool)
+	// managedpackageDescCreatedAt is the schema descriptor for created_at field.
+	managedpackageDescCreatedAt := managedpackageFields[5].Descriptor()
+	// managedpackage.DefaultCreatedAt holds the default value on creation for the created_at field.
+	managedpackage.DefaultCreatedAt = managedpackageDescCreatedAt.Default.(func() time.Time)
 	// managedpackageDescUpdatedAt is the schema descriptor for updated_at field.
 	managedpackageDescUpdatedAt := managedpackageFields[6].Descriptor()
+	// managedpackage.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	managedpackage.DefaultUpdatedAt = managedpackageDescUpdatedAt.Default.(func() time.Time)
 	// managedpackage.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	managedpackage.UpdateDefaultUpdatedAt = managedpackageDescUpdatedAt.UpdateDefault.(func() time.Time)
 }

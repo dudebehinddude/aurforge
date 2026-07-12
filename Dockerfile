@@ -13,4 +13,6 @@ RUN pacman -Syu --noconfirm \
     && pacman -Scc --noconfirm
 
 COPY --from=build /out/aurforge /usr/local/bin/aurforge
+COPY scripts/install-host-cli.sh scripts/uninstall-host-cli.sh /usr/local/share/aurforge/
+RUN chmod 0755 /usr/local/share/aurforge/*.sh
 ENTRYPOINT ["/usr/local/bin/aurforge"]

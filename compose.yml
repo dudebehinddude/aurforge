@@ -28,6 +28,19 @@ x-app-common: &app-common
     - no-new-privileges:true
   extra_hosts:
     - host.docker.internal:host-gateway
+  networks:
+    - default
+    - database
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME:-aurforge}_default
+  # Leave AURFORGE_DATABASE_NETWORK empty to use a private unused network.
+  # Set AURFORGE_DATABASE_NETWORK to an existing network and
+  # AURFORGE_DATABASE_EXTERNAL=true to join your Postgres Compose network.
+  database:
+    name: ${AURFORGE_DATABASE_NETWORK:-${COMPOSE_PROJECT_NAME:-aurforge}_database}
+    external: ${AURFORGE_DATABASE_EXTERNAL:-false}
 
 services:
   controller:
@@ -36,11 +49,18 @@ services:
     environment:
       <<: *app-environment
       AURFORGE_HTTP_ADDR: 0.0.0.0:8080
+      AURFORGE_COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-aurforge}
+      AURFORGE_CLI_BIN_DIR: /host-bin
     volumes:
       - ${AURFORGE_DATA_ROOT:?AURFORGE_DATA_ROOT is required}:/var/lib/aurforge
       - ${AURFORGE_LOCAL_IMPORT_ROOT:?AURFORGE_LOCAL_IMPORT_ROOT is required}:/imports:ro
+      - /usr/local/bin:/host-bin
     expose:
       - "8080"
+    post_start:
+      - command: ["/usr/local/share/aurforge/install-host-cli.sh"]
+    pre_stop:
+      - command: ["/usr/local/share/aurforge/uninstall-host-cli.sh"]
 
   scheduler:
     <<: *app-common
@@ -75,6 +95,8 @@ services:
     restart: unless-stopped
     depends_on:
       - controller
+    networks:
+      - default
     ports:
       - "${AURFORGE_REPO_BIND:-127.0.0.1}:${AURFORGE_REPO_PORT:-8088}:8080"
     volumes:

@@ -62,6 +62,9 @@ func PreviewLocal(cfg Config, path string) (Preview, error) {
 	if err != nil {
 		return Preview{}, err
 	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(cleanRoot, path)
+	}
 	cleanPath, err := filepath.Abs(path)
 	if err != nil {
 		return Preview{}, err

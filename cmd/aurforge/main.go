@@ -206,7 +206,7 @@ func showPreview(preview internal.Preview) {
 func usage() {
 	fmt.Fprintln(os.Stderr, "usage: aurforge <controller|scheduler|worker|publisher|add|update|status>")
 	fmt.Fprintln(os.Stderr, "       aurforge add <aur-query> [--select N] [--yes]")
-	fmt.Fprintln(os.Stderr, "       aurforge add --local /imports/package [--yes]")
+	fmt.Fprintln(os.Stderr, "       aurforge add --local <package> [--yes]")
 }
 
 func fatal(err error) { fmt.Fprintln(os.Stderr, "aurforge:", err); os.Exit(1) }

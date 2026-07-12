@@ -17,8 +17,8 @@ func (ManagedPackage) Fields() []ent.Field {
 		field.String("source_ref"),
 		field.String("source_path"),
 		field.Bool("enabled").Default(true),
-		field.Time("created_at").Immutable(),
-		field.Time("updated_at").UpdateDefault(func() time.Time { return time.Now() }),
+		field.Time("created_at").Default(time.Now).Immutable(),
+		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),
 	}
 }
 
