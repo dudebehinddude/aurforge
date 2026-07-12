@@ -1,0 +1,93 @@
+name: aurforge
+
+x-app-common: &app-common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: aurforge-app:${AURFORGE_IMAGE_TAG:-latest}
+  restart: unless-stopped
+  environment: &app-environment
+    DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must point to the external PostgreSQL instance}
+    AURFORGE_DATA_ROOT: /var/lib/aurforge
+    AURFORGE_HOST_DATA_ROOT: ${AURFORGE_DATA_ROOT:?AURFORGE_DATA_ROOT is required}
+    AURFORGE_LOCAL_IMPORT_ROOT: /imports
+    AURFORGE_REPOSITORY_NAME: ${AURFORGE_REPOSITORY_NAME:-aurforge}
+    AURFORGE_UPDATE_DELAY: ${AURFORGE_UPDATE_DELAY:-12h}
+    AURFORGE_POLL_INTERVAL: ${AURFORGE_POLL_INTERVAL:-30m}
+    AURFORGE_NTFY_URL: ${AURFORGE_NTFY_URL:-}
+    AURFORGE_NTFY_TOPIC: ${AURFORGE_NTFY_TOPIC:-}
+    AURFORGE_NTFY_TOKEN: ${AURFORGE_NTFY_TOKEN:-}
+    AURFORGE_LOG_LEVEL: ${AURFORGE_LOG_LEVEL:-info}
+    AURFORGE_SHUTDOWN_TIMEOUT: ${AURFORGE_SHUTDOWN_TIMEOUT:-30s}
+  cpus: ${AURFORGE_APP_CPU_LIMIT:-1.0}
+  cpu_shares: ${AURFORGE_APP_CPU_SHARES:-512}
+  mem_limit: ${AURFORGE_APP_MEMORY_LIMIT:-512m}
+  pids_limit: ${AURFORGE_APP_PIDS_LIMIT:-256}
+  stop_grace_period: ${AURFORGE_SHUTDOWN_TIMEOUT:-30s}
+  security_opt:
+    - no-new-privileges:true
+  extra_hosts:
+    - host.docker.internal:host-gateway
+
+services:
+  controller:
+    <<: *app-common
+    command: ["controller"]
+    environment:
+      <<: *app-environment
+      AURFORGE_HTTP_ADDR: 0.0.0.0:8080
+    volumes:
+      - ${AURFORGE_DATA_ROOT:?AURFORGE_DATA_ROOT is required}:/var/lib/aurforge
+      - ${AURFORGE_LOCAL_IMPORT_ROOT:?AURFORGE_LOCAL_IMPORT_ROOT is required}:/imports:ro
+    expose:
+      - "8080"
+
+  scheduler:
+    <<: *app-common
+    command: ["scheduler"]
+    volumes:
+      - ${AURFORGE_DATA_ROOT:?AURFORGE_DATA_ROOT is required}:/var/lib/aurforge
+
+  worker:
+    <<: *app-common
+    command: ["worker"]
+    environment:
+      <<: *app-environment
+      AURFORGE_BUILDER_IMAGE: ${AURFORGE_BUILDER_IMAGE:-aurforge-builder:latest}
+      AURFORGE_BUILD_CPU_LIMIT: ${AURFORGE_BUILD_CPU_LIMIT:-80%}
+      AURFORGE_BUILD_CPU_SHARES: ${AURFORGE_BUILD_CPU_SHARES:-1024}
+      AURFORGE_BUILD_MEMORY_LIMIT: ${AURFORGE_BUILD_MEMORY_LIMIT:-2g}
+      AURFORGE_BUILD_PIDS_LIMIT: ${AURFORGE_BUILD_PIDS_LIMIT:-512}
+      AURFORGE_BUILD_TIMEOUT: ${AURFORGE_BUILD_TIMEOUT:-60m}
+      AURFORGE_BUILD_OUTPUT_ROOT: /var/lib/aurforge/output
+    volumes:
+      - ${AURFORGE_DATA_ROOT:?AURFORGE_DATA_ROOT is required}:/var/lib/aurforge
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  publisher:
+    <<: *app-common
+    command: ["publisher"]
+    volumes:
+      - ${AURFORGE_DATA_ROOT:?AURFORGE_DATA_ROOT is required}:/var/lib/aurforge
+
+  repo:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - controller
+    ports:
+      - "${AURFORGE_REPO_BIND:-127.0.0.1}:${AURFORGE_REPO_PORT:-8088}:8080"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${AURFORGE_DATA_ROOT:?AURFORGE_DATA_ROOT is required}/repo:/srv/repo:ro
+    cpus: ${AURFORGE_REPO_CPU_LIMIT:-0.5}
+    cpu_shares: ${AURFORGE_REPO_CPU_SHARES:-256}
+    mem_limit: ${AURFORGE_REPO_MEMORY_LIMIT:-128m}
+    pids_limit: ${AURFORGE_REPO_PIDS_LIMIT:-64}
+    stop_grace_period: ${AURFORGE_SHUTDOWN_TIMEOUT:-30s}
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
