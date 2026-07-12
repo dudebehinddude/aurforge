@@ -32,6 +32,8 @@ func LoadConfig() (Config, error) {
 	cfg := Config{
 		DatabaseURL:     os.Getenv("DATABASE_URL"),
 		DataRoot:        envOr("AURFORGE_DATA_ROOT", "/var/lib/aurforge"),
+		// May be relative when Compose passes AURFORGE_DATA_ROOT through.
+		// The worker resolves it to an absolute host path via docker inspect.
 		HostDataRoot:    envOr("AURFORGE_HOST_DATA_ROOT", "/srv/aurforge"),
 		LocalImportRoot: envOr("AURFORGE_LOCAL_IMPORT_ROOT", "/imports"),
 		BuilderImage:    envOr("AURFORGE_BUILDER_IMAGE", "aurforge-builder:latest"),

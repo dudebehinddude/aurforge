@@ -103,6 +103,13 @@ func refreshAUR(ctx context.Context, cfg Config, db *ent.Client, logger *slog.Lo
 }
 
 func RunWorker(ctx context.Context, cfg Config, db *ent.Client, logger *slog.Logger) error {
+	hostRoot, err := resolveHostDataRoot(cfg.DataRoot, cfg.HostDataRoot)
+	if err != nil {
+		return err
+	}
+	cfg.HostDataRoot = hostRoot
+	logger.Info("using host data root", "path", hostRoot)
+
 	for {
 		job, err := ClaimJob(ctx, db)
 		if err != nil {
@@ -138,17 +145,19 @@ func buildJob(parent context.Context, cfg Config, job Job) error {
 	hostSource := filepath.Join(cfg.HostDataRoot, relativeSource)
 	hostOutput := filepath.Join(cfg.HostDataRoot, "staging", fmt.Sprintf("job-%d", job.ID))
 	hostCache := filepath.Join(cfg.HostDataRoot, "cache", "pacman")
+	outputDir := filepath.Join(cfg.StagingRoot(), fmt.Sprintf("job-%d", job.ID))
+	cacheDir := filepath.Join(cfg.CacheRoot(), "pacman")
 	buildCPUs, err := resolveCPUCap(ctx, cfg.BuildCPUs)
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(hostOutput, 0o750); err != nil {
+	if err := os.MkdirAll(outputDir, 0o750); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(hostCache, 0o755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return err
 	}
-	if err := os.Chown(hostOutput, 1000, 1000); err != nil {
+	if err := os.Chown(outputDir, 1000, 1000); err != nil {
 		return err
 	}
 	command := exec.CommandContext(ctx, "docker", "run", "--rm", "--network", "bridge", "--read-only",

@@ -13,8 +13,9 @@ publishes resulting package archives for pacman and yay clients.
 
 ## Configure And Start
 
-Copy `.env.example` to `.env`. Set `DATABASE_URL`, `AURFORGE_DATA_ROOT`, and
-`AURFORGE_LOCAL_IMPORT_ROOT` to absolute host paths.
+Copy `.env.example` to `.env`. Set `DATABASE_URL`. `AURFORGE_DATA_ROOT` and
+`AURFORGE_LOCAL_IMPORT_ROOT` may be relative to the compose project directory;
+the worker resolves the absolute host path from the data-root bind mount.
 
 If PostgreSQL exposes a port on the same Ubuntu host, use
 `host.docker.internal` in `DATABASE_URL`, for example:
