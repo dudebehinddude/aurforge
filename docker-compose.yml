@@ -71,6 +71,9 @@ services:
   worker:
     <<: *app-common
     command: ["worker"]
+    depends_on:
+      builder:
+        condition: service_completed_successfully
     environment:
       <<: *app-environment
       AURFORGE_BUILDER_IMAGE: ${AURFORGE_BUILDER_IMAGE:-aurforge-builder:latest}
@@ -83,6 +86,16 @@ services:
     volumes:
       - ${AURFORGE_DATA_ROOT:?AURFORGE_DATA_ROOT is required}:/var/lib/aurforge
       - /var/run/docker.sock:/var/run/docker.sock
+
+  # Ensures `docker compose up --build` refreshes the makepkg image the worker launches.
+  builder:
+    image: ${AURFORGE_BUILDER_IMAGE:-aurforge-builder:latest}
+    build:
+      context: images/builder
+    network_mode: none
+    restart: "no"
+    command: ["true"]
+    entrypoint: ["true"]
 
   publisher:
     <<: *app-common

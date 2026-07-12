@@ -18,6 +18,12 @@ if [[ ! -d /input ]]; then
 fi
 
 cp -a /input/. "$workdir"/
+if [[ ! -f "$workdir/PKGBUILD" ]]; then
+  printf '%s\n' "PKGBUILD missing after copy from /input; contents:" >&2
+  ls -la /input >&2 || true
+  ls -la "$workdir" >&2 || true
+  exit 1
+fi
 cd "$workdir"
 
 if [[ "$#" -eq 0 ]]; then

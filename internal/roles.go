@@ -157,6 +157,9 @@ func buildJob(parent context.Context, cfg Config, job Job) error {
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return err
 	}
+	if _, err := os.Stat(filepath.Join(job.SourcePath, "PKGBUILD")); err != nil {
+		return fmt.Errorf("source snapshot missing PKGBUILD at %s: %w", job.SourcePath, err)
+	}
 	if err := ensureBuilderReadable(job.SourcePath); err != nil {
 		return err
 	}

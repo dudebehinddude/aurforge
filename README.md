@@ -46,13 +46,8 @@ sudo install -d -m 0750 /srv/aurforge/{sources,cache,staging,repo,logs}
 sudo install -d -m 0750 /srv/aurforge-imports
 ```
 
-Build the package-job image once:
-
-```sh
-docker build -t aurforge-builder:latest images/builder
-```
-
-Start the control services and repository endpoint:
+Start the control services and repository endpoint (`--build` also refreshes the
+makepkg builder image the worker launches):
 
 ```sh
 docker compose up --build -d
