@@ -49,6 +49,47 @@ func TestHashTreeChangesWithContent(t *testing.T) {
 	}
 }
 
+func TestHashTreeIgnoresPackageArtifacts(t *testing.T) {
+	directory := t.TempDir()
+	if err := os.WriteFile(filepath.Join(directory, "PKGBUILD"), []byte("pkgname=demo"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	first, err := HashTree(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "demo-1-1-x86_64.pkg.tar.zst"), []byte("blob"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	second, err := HashTree(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first != second {
+		t.Fatal("package artifact changed tree digest")
+	}
+}
+
+func TestCopyTreeSkipsPackageArtifacts(t *testing.T) {
+	source := t.TempDir()
+	destination := t.TempDir()
+	if err := os.WriteFile(filepath.Join(source, "PKGBUILD"), []byte("pkgname=demo"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "demo-1-1-x86_64.pkg.tar.zst"), []byte("blob"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := CopyTree(source, destination); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(destination, "PKGBUILD")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(destination, "demo-1-1-x86_64.pkg.tar.zst")); !os.IsNotExist(err) {
+		t.Fatal("package artifact was copied into snapshot")
+	}
+}
+
 func TestAuditPackage(t *testing.T) {
 	directory := t.TempDir()
 	if err := os.WriteFile(filepath.Join(directory, "PKGBUILD"), []byte("sha256sums=('SKIP')\nsudo true"), 0o644); err != nil {

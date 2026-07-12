@@ -27,7 +27,7 @@ fi
 cd "$workdir"
 
 if [[ "$#" -eq 0 ]]; then
-  set -- makepkg --syncdeps --noconfirm --cleanbuild
+  set -- makepkg --syncdeps --noconfirm --cleanbuild --force
 fi
 
 "$@"

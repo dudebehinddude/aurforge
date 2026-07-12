@@ -146,6 +146,9 @@ func HashTree(root string) (string, error) {
 		if entry.IsDir() {
 			return nil
 		}
+		if isBuildArtifact(entry.Name()) {
+			return nil
+		}
 		paths = append(paths, path)
 		return nil
 	})
@@ -169,6 +172,10 @@ func HashTree(root string) (string, error) {
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
+func isBuildArtifact(name string) bool {
+	return strings.Contains(name, ".pkg.tar.")
+}
+
 func CopyTree(source, destination string) error {
 	return filepath.WalkDir(source, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -179,6 +186,9 @@ func CopyTree(source, destination string) error {
 			if entry.IsDir() {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if !entry.IsDir() && isBuildArtifact(entry.Name()) {
 			return nil
 		}
 		target := filepath.Join(destination, rel)
