@@ -127,9 +127,7 @@ func refreshLocal(ctx context.Context, cfg Config, db *ent.Client, logger *slog.
 			continue
 		}
 		updateCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
-		command := exec.CommandContext(updateCtx, "sh", updater)
-		command.Dir = preview.Path
-		result, err := command.CombinedOutput()
+		result, err := runLocalUpdater(updateCtx, preview.Path)
 		cancel()
 		if err != nil {
 			failure := fmt.Errorf("run update-pkgbuild.sh: %w: %s", err, strings.TrimSpace(string(result)))

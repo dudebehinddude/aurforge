@@ -10,7 +10,8 @@ FROM archlinux:base
 
 RUN pacman -Syu --noconfirm \
     && pacman -S --noconfirm --needed ca-certificates curl docker git pacman-contrib \
-    && pacman -Scc --noconfirm
+    && pacman -Scc --noconfirm \
+    && useradd --create-home --uid 1000 --shell /bin/sh updater
 
 COPY --from=build /out/aurforge /usr/local/bin/aurforge
 COPY scripts/install-host-cli.sh scripts/uninstall-host-cli.sh /usr/local/share/aurforge/

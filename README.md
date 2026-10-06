@@ -90,8 +90,10 @@ older job is skipped so a reverted or replaced PKGBUILD is never built.
 Local packages without an updater change only through the explicit
 `aurforge update --local` flow. A local package can opt into automatic updates
 by including `update-pkgbuild.sh`; the scheduler runs it from the trusted local
-import directory on every poll. If it changes the package, Aurforge snapshots
-the result and queues it immediately. The updater must keep `PKGBUILD` and, if
+import directory on every poll as that directory's non-root owner. Root-owned
+imports use the container's `updater` account. Root-owned files left by earlier
+updaters are reassigned to that owner before running the script. If it changes the
+package, Aurforge snapshots the result and queues it immediately. The updater must keep `PKGBUILD` and, if
 present, `.SRCINFO` synchronized. Build containers only receive that immutable
 snapshot, not the import directory.
 
